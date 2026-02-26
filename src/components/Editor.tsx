@@ -11,10 +11,15 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 
 export default function Editor({ 
   onConverted, 
-  onOrientationChange 
+  onOrientationChange, 
+  currentPages, 
+  isLandscape  
 }: { 
   onConverted: (images: string[]) => void,
-  onOrientationChange: (isLandscape: boolean) => void 
+  onOrientationChange: (isLandscape: boolean) => void,
+  currentPages: string[], 
+  isLandscape: boolean    
+
 }) {
 
   const [loading, setLoading] = useState(false);

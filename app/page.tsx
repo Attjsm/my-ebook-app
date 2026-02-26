@@ -32,8 +32,8 @@ export default function Home() {
         <Editor 
           onConverted={(images) => setPdfPages(images)} 
           onOrientationChange={(landscape) => setIsLandscape(landscape)} 
-            currentPages={pdfPages}    // 👈 เพิ่มอันนี้
-            isLandscape={isLandscape}  // 👈 เพิ่มอันนี้
+            currentPages={pdfPages}
+            isLandscape={isLandscape}
         />
       </header>
       
