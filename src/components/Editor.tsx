@@ -40,10 +40,10 @@ const IconClose = () => (
 // ─── Orientation Toggle ───────────────────────────────────────────────────────
 function OrientationToggle({ isLandscape, onChange }: { isLandscape: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 w-full">
+    <div className="inline-flex bg-gray-100 p-1 rounded-xl border border-gray-200">
       <button
         onClick={() => onChange(false)}
-        className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
           !isLandscape ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
         }`}
       >
@@ -51,7 +51,7 @@ function OrientationToggle({ isLandscape, onChange }: { isLandscape: boolean; on
       </button>
       <button
         onClick={() => onChange(true)}
-        className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
           isLandscape ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
         }`}
       >
@@ -268,7 +268,24 @@ export default function Editor({
           {/* Orientation */}
           <div>
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-2.5">รูปแบบการแสดงผล</p>
-            <OrientationToggle isLandscape={isLandscape} onChange={onOrientationChange} />
+            <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 w-full">
+              <button
+                onClick={() => onOrientationChange(false)}
+                className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                  !isLandscape ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'
+                }`}
+              >
+                Portrait (แนวตั้ง)
+              </button>
+              <button
+                onClick={() => onOrientationChange(true)}
+                className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                  isLandscape ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'
+                }`}
+              >
+                Landscape (แนวนอน)
+              </button>
+            </div>
           </div>
 
           <div className="border-t border-gray-100" />

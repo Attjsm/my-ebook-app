@@ -1,8 +1,7 @@
 "use client";
-import React, { useRef, useState, useCallback, useEffect, TouchEvent } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import HTMLFlipBook from 'react-pageflip';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface FlipbookProps {
   pages: string[];
   isLandscape: boolean;
@@ -13,11 +12,10 @@ const NAVBAR_H = 64;
 const PADDING  = 16;
 
 function getControlsH(screenIsLandscape: boolean) {
-  // compact controls on landscape mobile to maximise book height
-  return screenIsLandscape ? 52 : 88;
+  return screenIsLandscape ? 52 : 92;
 }
 
-// ─── Hook: Screen orientation (physical, not PDF orientation) ─────────────────
+// ─── Hook: Screen orientation ─────────────────────────────────────────────────
 function useScreenLandscape() {
   const [ls, setLs] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false
@@ -30,7 +28,7 @@ function useScreenLandscape() {
   return ls;
 }
 
-// ─── Hook: Measure available viewport for the book stage ─────────────────────
+// ─── Hook: Book dimensions ────────────────────────────────────────────────────
 function useBookDimensions(isLandscape: boolean) {
   const [dims, setDims] = useState({ width: 300, height: 420 });
 
@@ -40,31 +38,19 @@ function useBookDimensions(isLandscape: boolean) {
       const vh = window.innerHeight;
       const screenLandscape = vw > vh;
       const controlsH = getControlsH(screenLandscape);
-
       const stageW = vw - PADDING;
       const stageH = vh - NAVBAR_H - controlsH - PADDING;
 
       let w: number, h: number;
-
       if (isLandscape) {
-        // PDF page is A4 landscape: ratio 1.41 : 1
-        if (stageW / stageH > 1.41) {
-          h = stageH; w = Math.round(h * 1.41);
-        } else {
-          w = stageW; h = Math.round(w / 1.41);
-        }
+        if (stageW / stageH > 1.41) { h = stageH; w = Math.round(h * 1.41); }
+        else                         { w = stageW; h = Math.round(w / 1.41); }
       } else {
-        // PDF page is A4 portrait: ratio 1 : 1.41
-        if (stageW / stageH > 1 / 1.41) {
-          h = stageH; w = Math.round(h / 1.41);
-        } else {
-          w = stageW; h = Math.round(w * 1.41);
-        }
+        if (stageW / stageH > 1 / 1.41) { h = stageH; w = Math.round(h / 1.41); }
+        else                              { w = stageW; h = Math.round(w * 1.41); }
       }
-
       setDims({ width: Math.max(w, 100), height: Math.max(h, 120) });
     }
-
     calc();
     window.addEventListener('resize', calc);
     return () => window.removeEventListener('resize', calc);
@@ -73,80 +59,29 @@ function useBookDimensions(isLandscape: boolean) {
   return dims;
 }
 
-// ─── Hook: Pinch-to-Zoom ──────────────────────────────────────────────────────
-function usePinchZoom(minScale = 1, maxScale = 4) {
+// ─── Hook: Button-based zoom (zero touch conflict) ────────────────────────────
+function useZoom(min = 1, max = 3, step = 0.4) {
   const [scale, setScale] = useState(1);
-  const [origin, setOrigin] = useState({ x: 50, y: 50 });
-  const [isPinching, setIsPinching] = useState(false);
-  const lastDist = useRef<number | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const getDistance = (a: React.Touch, b: React.Touch) =>
-    Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-
-  const onTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length === 2) {
-      lastDist.current = getDistance(e.touches[0], e.touches[1]);
-      setIsPinching(true);
-      // Stop the event reaching react-pageflip so it won't trigger a flip
-      e.stopPropagation();
-    }
-  }, []);
-
-  const onTouchMove = useCallback(
-    (e: TouchEvent<HTMLDivElement>) => {
-      if (e.touches.length === 2 && lastDist.current !== null) {
-        e.preventDefault();
-        e.stopPropagation();           // ← prevent flip while pinching
-        const dist = getDistance(e.touches[0], e.touches[1]);
-        const delta = dist / lastDist.current;
-        lastDist.current = dist;
-        setScale((s) => Math.min(maxScale, Math.max(minScale, s * delta)));
-
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (rect) {
-          const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-          const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-          setOrigin({
-            x: ((mx - rect.left) / rect.width) * 100,
-            y: ((my - rect.top) / rect.height) * 100,
-          });
-        }
-      }
-    },
-    [maxScale, minScale]
-  );
-
-  const onTouchEnd = useCallback((e: TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length < 2) {
-      lastDist.current = null;
-      setIsPinching(false);
-    }
-  }, []);
-
-  const resetZoom = () => { setScale(1); setIsPinching(false); };
-
-  return { scale, origin, isPinching, containerRef, onTouchStart, onTouchMove, onTouchEnd, resetZoom };
+  const zoomIn  = useCallback(() => setScale(s => Math.min(max,  Math.round((s + step) * 10) / 10)), [max, step]);
+  const zoomOut = useCallback(() => setScale(s => Math.max(min,  Math.round((s - step) * 10) / 10)), [min, step]);
+  const reset   = useCallback(() => setScale(1), []);
+  return { scale, zoomIn, zoomOut, reset, canIn: scale < max, canOut: scale > min };
 }
 
-// ─── Flip Sound (Web Audio API) ───────────────────────────────────────────────
+// ─── Flip Sound ───────────────────────────────────────────────────────────────
 function playFlipSound() {
   try {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const buf = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
     const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < data.length; i++)
       data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 3) * 0.35;
-    }
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    const gain = ctx.createGain();
-    gain.gain.value = 0.4;
-    src.connect(gain);
-    gain.connect(ctx.destination);
-    src.start();
+    const gain = ctx.createGain(); gain.gain.value = 0.4;
+    src.connect(gain); gain.connect(ctx.destination); src.start();
     setTimeout(() => ctx.close(), 500);
-  } catch { /* silent fail */ }
+  } catch { /* silent */ }
 }
 
 // ─── Page Component ───────────────────────────────────────────────────────────
@@ -175,6 +110,43 @@ const Page = React.forwardRef<
 ));
 Page.displayName = 'Page';
 
+// ─── Icon components ──────────────────────────────────────────────────────────
+const IconZoomIn = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.8"/>
+    <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M7 5v4M5 7h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+const IconZoomOut = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.8"/>
+    <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M5 7h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+const IconReset = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <path d="M2 7a5 5 0 1 0 1.5-3.5L2 2v3h3L3.8 3.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// ─── Control Button ───────────────────────────────────────────────────────────
+function CtrlBtn({ onClick, disabled, label, children }: {
+  onClick: () => void; disabled?: boolean; label: string; children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="w-10 h-10 rounded-full bg-white/60 backdrop-blur-sm border border-white/80 flex items-center justify-center text-amber-900 shadow-md disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all duration-150 hover:bg-white/90"
+    >
+      {children}
+    </button>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
   const flipBookRef = useRef<any>(null);
@@ -183,10 +155,8 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
 
   const screenLandscape = useScreenLandscape();
   const controlsH = getControlsH(screenLandscape);
-
   const { width: bookW, height: bookH } = useBookDimensions(isLandscape);
-  const { scale, origin, isPinching, containerRef, onTouchStart, onTouchMove, onTouchEnd, resetZoom } =
-    usePinchZoom(1, 4);
+  const { scale, zoomIn, zoomOut, reset, canIn, canOut } = useZoom();
 
   const totalPages = pages.length;
   const goNext = () => flipBookRef.current?.pageFlip().flipNext();
@@ -198,10 +168,9 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
     playFlipSound();
   };
 
-  if (pages.length === 0) return null;
+  if (!pages.length) return null;
 
-  const progressPercent = totalPages > 1 ? (currentPage / (totalPages - 1)) * 100 : 0;
-  // On landscape mobile, skip the navbar offset (public reader has no navbar)
+  const progress = totalPages > 1 ? (currentPage / (totalPages - 1)) * 100 : 0;
   const topPad = screenLandscape ? 4 : NAVBAR_H + 4;
 
   return (
@@ -213,31 +182,17 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
         paddingTop: topPad,
       }}
     >
-      {/* ── Book Stage ─────────────────────────────────────── */}
-      <div
-        ref={containerRef}
-        className="flex-1 w-full flex items-center justify-center overflow-hidden"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        style={{
-          // 'none' during pinch so browser doesn't scroll/pan; 'pan-y' otherwise for normal scroll
-          touchAction: isPinching ? 'none' : 'pan-y',
-        }}
-      >
+      {/* ── Book Stage ─────────────────────────────────────────────── */}
+      <div className="flex-1 w-full flex items-center justify-center overflow-hidden">
         <div
           style={{
             transform: `scale(${scale})`,
-            transformOrigin: `${origin.x}% ${origin.y}%`,
-            transition: isFlipping ? 'none' : 'transform 0.15s ease-out',
+            transformOrigin: 'center center',
+            transition: isFlipping ? 'none' : 'transform 0.2s ease-out',
             willChange: 'transform',
           }}
         >
-          <div
-            style={{
-              filter: 'drop-shadow(0 20px 40px rgba(80,60,40,0.35)) drop-shadow(0 4px 10px rgba(80,60,40,0.2))',
-            }}
-          >
+          <div style={{ filter: 'drop-shadow(0 20px 40px rgba(80,60,40,0.35)) drop-shadow(0 4px 10px rgba(80,60,40,0.2))' }}>
             {/* @ts-ignore */}
             <HTMLFlipBook
               ref={flipBookRef}
@@ -249,8 +204,7 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
               drawShadow={true}
               flippingTime={700}
               showCover={true}
-              // Disable flipbook's own touch handling while pinching so it can't fire a flip
-              mobileScrollSupport={!isPinching}
+              mobileScrollSupport={true}
               onFlip={handleFlip}
               onChangeState={(s: any) => { if (s.data === 'flipping') setIsFlipping(true); }}
             >
@@ -263,69 +217,74 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
         </div>
       </div>
 
-      {/* ── Controls Bar (compact on landscape mobile) ─────── */}
+      {/* ── Controls Bar ───────────────────────────────────────────── */}
       <div
         className="w-full flex flex-col items-center justify-center gap-1.5 px-4"
-        style={{ height: controlsH, paddingBottom: screenLandscape ? 4 : 12 }}
+        style={{ height: controlsH, paddingBottom: screenLandscape ? 4 : 10 }}
       >
         {/* Progress bar */}
         <div className="w-full max-w-md h-[3px] rounded-full bg-black/10 overflow-hidden">
           <div
             className="h-full rounded-full bg-amber-700/60 transition-all duration-500"
-            style={{ width: `${progressPercent}%` }}
+            style={{ width: `${progress}%` }}
           />
         </div>
 
-        {/* Buttons */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={goPrev}
-            disabled={currentPage === 0}
-            aria-label="Previous page"
-            className="w-10 h-10 rounded-full bg-white/60 backdrop-blur-sm border border-white/80 flex items-center justify-center text-amber-900 shadow-md disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all duration-150 hover:bg-white/90"
-          >
+        {/* Button row */}
+        <div className="flex items-center gap-2.5">
+
+          {/* ← Prev page */}
+          <CtrlBtn onClick={goPrev} disabled={currentPage === 0} label="หน้าก่อนหน้า">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-          </button>
+          </CtrlBtn>
 
-          <div className="flex flex-col items-center min-w-[60px]">
+          {/* Page counter */}
+          <div className="flex flex-col items-center min-w-[52px]">
             {!screenLandscape && (
-              <span className="text-[10px] font-semibold tracking-widest text-amber-900/60 uppercase">Page</span>
+              <span className="text-[9px] font-semibold tracking-widest text-amber-900/50 uppercase">Page</span>
             )}
-            <span className="text-base font-bold text-amber-950 leading-tight tabular-nums">
+            <span className="text-sm font-bold text-amber-950 leading-tight tabular-nums">
               {currentPage + 1}
               <span className="text-xs font-normal text-amber-900/50"> / {totalPages}</span>
             </span>
           </div>
 
-          <button
-            onClick={goNext}
-            disabled={currentPage >= totalPages - 1}
-            aria-label="Next page"
-            className="w-10 h-10 rounded-full bg-white/60 backdrop-blur-sm border border-white/80 flex items-center justify-center text-amber-900 shadow-md disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all duration-150 hover:bg-white/90"
-          >
+          {/* Next page → */}
+          <CtrlBtn onClick={goNext} disabled={currentPage >= totalPages - 1} label="หน้าถัดไป">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
+          </CtrlBtn>
+
+          {/* Divider */}
+          <div className="w-px h-6 bg-amber-900/20 mx-1" />
+
+          {/* Zoom out */}
+          <CtrlBtn onClick={zoomOut} disabled={!canOut} label="ย่อ">
+            <IconZoomOut />
+          </CtrlBtn>
+
+          {/* Zoom level badge — tap to reset */}
+          <button
+            onClick={reset}
+            disabled={scale === 1}
+            className="min-w-[44px] h-8 px-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/80 text-[11px] font-bold text-amber-900 shadow-sm disabled:opacity-50 active:scale-95 transition-all"
+            aria-label="รีเซ็ตการซูม"
+          >
+            {scale === 1 ? '100%' : `${Math.round(scale * 100)}%`}
           </button>
 
-          {scale > 1 && (
-            <button
-              onClick={resetZoom}
-              aria-label="Reset zoom"
-              className="w-10 h-10 rounded-full bg-amber-700/80 backdrop-blur-sm border border-amber-600/50 flex items-center justify-center text-white shadow-md active:scale-95 transition-all duration-150 hover:bg-amber-700"
-            >
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                <path d="M2 7.5a5.5 5.5 0 1 0 11 0 5.5 5.5 0 0 0-11 0Zm5-2v4m-2-2h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-          )}
+          {/* Zoom in */}
+          <CtrlBtn onClick={zoomIn} disabled={!canIn} label="ขยาย">
+            <IconZoomIn />
+          </CtrlBtn>
         </div>
 
         {!screenLandscape && (
           <p className="text-[10px] tracking-widest text-amber-900/40 uppercase font-medium">
-            Pinch to zoom • Tap corners to flip
+            กดปุ่ม 🔍 ขยาย • แตะมุมหน้าเพื่อพลิก
           </p>
         )}
       </div>
