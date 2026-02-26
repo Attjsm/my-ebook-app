@@ -53,6 +53,112 @@ const IconLink = () => (
   </svg>
 );
 
+// ─── Loading Overlay: PDF Convert ────────────────────────────────────────────
+function PdfLoadingOverlay({ progress }: { progress: number }) {
+  const pct  = Math.min(100, Math.max(0, progress));
+  const circ = 2 * Math.PI * 36;
+  const dash = circ - (pct / 100) * circ;
+  return (
+    <>
+      <style>{`
+        @keyframes pulseRing { 0%,100%{opacity:.15;transform:scale(1)} 50%{opacity:.35;transform:scale(1.08)} }
+        @keyframes floatDoc  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+        .pdf-pulse { animation: pulseRing 2s ease-in-out infinite; }
+        .pdf-float { animation: floatDoc  2s ease-in-out infinite; }
+      `}</style>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-md">
+        <div className="flex flex-col items-center gap-6 p-10 rounded-3xl"
+          style={{ background:"linear-gradient(135deg,#1e3a5f 0%,#0f2040 100%)", boxShadow:"0 32px 80px rgba(0,0,0,0.6)" }}>
+          <div className="relative w-32 h-32 flex items-center justify-center">
+            <div className="pdf-pulse absolute inset-0 rounded-full border-4 border-blue-400/30" />
+            <svg className="-rotate-90 absolute inset-0" width="128" height="128" viewBox="0 0 128 128">
+              <circle cx="64" cy="64" r="36" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8"/>
+              <circle cx="64" cy="64" r="36" fill="none" stroke="#3b82f6" strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={String(circ)}
+                strokeDashoffset={dash}
+                style={{ transition:"stroke-dashoffset 0.4s ease" }}/>
+            </svg>
+            <div className="pdf-float flex flex-col items-center gap-0.5 z-10">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#3b82f6" opacity=".9"/>
+                <path d="M14 2v6h6" fill="none" stroke="#93c5fd" strokeWidth="1.5"/>
+                <text x="6.5" y="19" fontSize="5.5" fill="white" fontWeight="bold" fontFamily="sans-serif">PDF</text>
+              </svg>
+              <span className="text-white text-xl font-black tabular-nums leading-none">{pct}%</span>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <p className="text-white font-bold text-base">กำลังแปลง PDF</p>
+            <p className="text-blue-300/70 text-xs">แปลงหน้ากระดาษเป็นภาพ...</p>
+          </div>
+          <div className="w-56 flex flex-col gap-1.5">
+            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-blue-400 transition-all duration-300" style={{ width:`${pct}%` }}/>
+            </div>
+            <div className="flex justify-between text-[10px] text-blue-300/50 font-medium">
+              <span>เริ่ม</span><span>เสร็จสิ้น</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Loading Overlay: Share ───────────────────────────────────────────────────
+function ShareLoadingOverlay() {
+  return (
+    <>
+      <style>{`
+        @keyframes shOrbit1  { from{transform:rotate(0deg) translateX(44px) rotate(0deg)}    to{transform:rotate(360deg) translateX(44px) rotate(-360deg)}   }
+        @keyframes shOrbit2  { from{transform:rotate(180deg) translateX(44px) rotate(-180deg)} to{transform:rotate(540deg) translateX(44px) rotate(-540deg)} }
+        @keyframes shOrbit3  { from{transform:rotate(90deg) translateX(56px) rotate(-90deg)}   to{transform:rotate(450deg) translateX(56px) rotate(-450deg)} }
+        @keyframes shSpin    { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes shShimmer { 0%{left:-33%} 100%{left:110%} }
+        @keyframes shFadeUp  { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        .sh-orbit1 { animation: shOrbit1  2.4s linear infinite; }
+        .sh-orbit2 { animation: shOrbit2  2.4s linear infinite; }
+        .sh-orbit3 { animation: shOrbit3  3.2s linear infinite; }
+        .sh-spin   { animation: shSpin    1.8s linear infinite;  }
+        .sh-fadein { animation: shFadeUp  0.4s ease forwards;    }
+        .sh-shim   { animation: shShimmer 1.6s ease-in-out infinite; }
+      `}</style>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-md">
+        <div className="sh-fadein flex flex-col items-center gap-7 px-12 py-10 rounded-3xl"
+          style={{ background:"linear-gradient(135deg,#14532d 0%,#052e16 100%)", boxShadow:"0 32px 80px rgba(0,0,0,0.6)" }}>
+          <div className="relative w-32 h-32 flex items-center justify-center">
+            <div className="sh-spin w-14 h-14 rounded-2xl bg-green-500/20 border border-green-400/30 flex items-center justify-center z-10">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="sh-orbit1 w-3 h-3 rounded-full bg-green-400" style={{ boxShadow:"0 0 8px #4ade80" }}/>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="sh-orbit2 w-2.5 h-2.5 rounded-full bg-emerald-300" style={{ boxShadow:"0 0 6px #6ee7b7" }}/>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="sh-orbit3 w-2 h-2 rounded-full bg-teal-400 opacity-70"/>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-1.5">
+            <p className="text-white font-bold text-base">กำลังสร้างลิงก์แชร์</p>
+            <p className="text-green-300/60 text-xs text-center leading-relaxed">
+              กำลังอัปโหลดไฟล์ไปยังเซิร์ฟเวอร์<br/>กรุณารอสักครู่...
+            </p>
+          </div>
+          <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden relative">
+            <div className="sh-shim absolute inset-y-0 w-1/3 rounded-full bg-green-400"/>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── Share Modal ──────────────────────────────────────────────────────────────
 function ShareModal({ url, onClose }: { url: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -283,7 +389,9 @@ export default function Editor({
   return (
     <>
       {/* ── Share Modal ── */}
-      {shareUrl && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
+      {shareUrl  && <ShareModal url={shareUrl} onClose={() => setShareUrl(null)} />}
+      {loading   && <PdfLoadingOverlay progress={progress} />}
+      {isSharing && <ShareLoadingOverlay />}
 
       {/* ══════ DESKTOP navbar ══════ */}
       <header className="hidden md:flex items-center justify-between px-6 py-3 bg-white border-b shadow-sm sticky top-0 z-50">
