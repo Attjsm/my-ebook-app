@@ -8,10 +8,29 @@ interface FlipbookProps {
   isLandscape: boolean;
 }
 
-// ─── Hook: Measure available viewport for the book stage ─────────────────────
-const CONTROLS_HEIGHT = 100; // px reserved for bottom controls bar
-const PADDING = 24;          // px total vertical/horizontal breathing room
+// ─── Constants ────────────────────────────────────────────────────────────────
+const NAVBAR_H = 64;
+const PADDING  = 16;
 
+function getControlsH(screenIsLandscape: boolean) {
+  // compact controls on landscape mobile to maximise book height
+  return screenIsLandscape ? 52 : 88;
+}
+
+// ─── Hook: Screen orientation (physical, not PDF orientation) ─────────────────
+function useScreenLandscape() {
+  const [ls, setLs] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth > window.innerHeight : false
+  );
+  useEffect(() => {
+    const update = () => setLs(window.innerWidth > window.innerHeight);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return ls;
+}
+
+// ─── Hook: Measure available viewport for the book stage ─────────────────────
 function useBookDimensions(isLandscape: boolean) {
   const [dims, setDims] = useState({ width: 300, height: 420 });
 
@@ -19,36 +38,31 @@ function useBookDimensions(isLandscape: boolean) {
     function calc() {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
+      const screenLandscape = vw > vh;
+      const controlsH = getControlsH(screenLandscape);
 
-      // Available stage area (minus navbar ~64px, controls, padding)
       const stageW = vw - PADDING;
-      const stageH = vh - 64 - CONTROLS_HEIGHT - PADDING;
+      const stageH = vh - NAVBAR_H - controlsH - PADDING;
 
       let w: number, h: number;
 
-      // Always single-page display for both portrait and landscape
-      // Landscape A4 ratio: 1.41:1 (w:h) | Portrait A4 ratio: 1:1.41
       if (isLandscape) {
-        // wider than tall — fit inside stage
+        // PDF page is A4 landscape: ratio 1.41 : 1
         if (stageW / stageH > 1.41) {
-          h = stageH;
-          w = Math.round(h * 1.41);
+          h = stageH; w = Math.round(h * 1.41);
         } else {
-          w = stageW;
-          h = Math.round(w / 1.41);
+          w = stageW; h = Math.round(w / 1.41);
         }
       } else {
-        // taller than wide
+        // PDF page is A4 portrait: ratio 1 : 1.41
         if (stageW / stageH > 1 / 1.41) {
-          h = stageH;
-          w = Math.round(h / 1.41);
+          h = stageH; w = Math.round(h / 1.41);
         } else {
-          w = stageW;
-          h = Math.round(w * 1.41);
+          w = stageW; h = Math.round(w * 1.41);
         }
       }
 
-      setDims({ width: Math.max(w, 120), height: Math.max(h, 160) });
+      setDims({ width: Math.max(w, 100), height: Math.max(h, 120) });
     }
 
     calc();
@@ -63,6 +77,7 @@ function useBookDimensions(isLandscape: boolean) {
 function usePinchZoom(minScale = 1, maxScale = 4) {
   const [scale, setScale] = useState(1);
   const [origin, setOrigin] = useState({ x: 50, y: 50 });
+  const [isPinching, setIsPinching] = useState(false);
   const lastDist = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +87,9 @@ function usePinchZoom(minScale = 1, maxScale = 4) {
   const onTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     if (e.touches.length === 2) {
       lastDist.current = getDistance(e.touches[0], e.touches[1]);
+      setIsPinching(true);
+      // Stop the event reaching react-pageflip so it won't trigger a flip
+      e.stopPropagation();
     }
   }, []);
 
@@ -79,6 +97,7 @@ function usePinchZoom(minScale = 1, maxScale = 4) {
     (e: TouchEvent<HTMLDivElement>) => {
       if (e.touches.length === 2 && lastDist.current !== null) {
         e.preventDefault();
+        e.stopPropagation();           // ← prevent flip while pinching
         const dist = getDistance(e.touches[0], e.touches[1]);
         const delta = dist / lastDist.current;
         lastDist.current = dist;
@@ -98,10 +117,16 @@ function usePinchZoom(minScale = 1, maxScale = 4) {
     [maxScale, minScale]
   );
 
-  const onTouchEnd = useCallback(() => { lastDist.current = null; }, []);
-  const resetZoom = () => setScale(1);
+  const onTouchEnd = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length < 2) {
+      lastDist.current = null;
+      setIsPinching(false);
+    }
+  }, []);
 
-  return { scale, origin, containerRef, onTouchStart, onTouchMove, onTouchEnd, resetZoom };
+  const resetZoom = () => { setScale(1); setIsPinching(false); };
+
+  return { scale, origin, isPinching, containerRef, onTouchStart, onTouchMove, onTouchEnd, resetZoom };
 }
 
 // ─── Flip Sound (Web Audio API) ───────────────────────────────────────────────
@@ -156,8 +181,11 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const [isFlipping, setIsFlipping] = useState(false);
 
+  const screenLandscape = useScreenLandscape();
+  const controlsH = getControlsH(screenLandscape);
+
   const { width: bookW, height: bookH } = useBookDimensions(isLandscape);
-  const { scale, origin, containerRef, onTouchStart, onTouchMove, onTouchEnd, resetZoom } =
+  const { scale, origin, isPinching, containerRef, onTouchStart, onTouchMove, onTouchEnd, resetZoom } =
     usePinchZoom(1, 4);
 
   const totalPages = pages.length;
@@ -173,14 +201,16 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
   if (pages.length === 0) return null;
 
   const progressPercent = totalPages > 1 ? (currentPage / (totalPages - 1)) * 100 : 0;
+  // On landscape mobile, skip the navbar offset (public reader has no navbar)
+  const topPad = screenLandscape ? 4 : NAVBAR_H + 4;
 
   return (
     <div
       className="w-full flex flex-col items-center justify-between select-none"
       style={{
-        height: '100dvh',           // dynamic viewport height — handles mobile browser chrome
+        height: '100dvh',
         background: 'radial-gradient(ellipse at 60% 40%, #e8e0d5 0%, #d4c9b8 100%)',
-        paddingTop: '68px',         // below navbar
+        paddingTop: topPad,
       }}
     >
       {/* ── Book Stage ─────────────────────────────────────── */}
@@ -190,7 +220,10 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        style={{ touchAction: scale > 1 ? 'none' : 'auto' }}
+        style={{
+          // 'none' during pinch so browser doesn't scroll/pan; 'pan-y' otherwise for normal scroll
+          touchAction: isPinching ? 'none' : 'pan-y',
+        }}
       >
         <div
           style={{
@@ -202,8 +235,7 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
         >
           <div
             style={{
-              filter:
-                'drop-shadow(0 20px 40px rgba(80,60,40,0.35)) drop-shadow(0 4px 10px rgba(80,60,40,0.2))',
+              filter: 'drop-shadow(0 20px 40px rgba(80,60,40,0.35)) drop-shadow(0 4px 10px rgba(80,60,40,0.2))',
             }}
           >
             {/* @ts-ignore */}
@@ -211,13 +243,14 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
               ref={flipBookRef}
               width={bookW}
               height={bookH}
-              size="fixed"           // ← fixed so we control exact size from useBookDimensions
-              usePortrait={true}     
+              size="fixed"
+              usePortrait={true}
               startPage={0}
               drawShadow={true}
               flippingTime={700}
               showCover={true}
-              mobileScrollSupport={scale <= 1}
+              // Disable flipbook's own touch handling while pinching so it can't fire a flip
+              mobileScrollSupport={!isPinching}
               onFlip={handleFlip}
               onChangeState={(s: any) => { if (s.data === 'flipping') setIsFlipping(true); }}
             >
@@ -230,10 +263,10 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
         </div>
       </div>
 
-      {/* ── Controls Bar ───────────────────────────────────── */}
+      {/* ── Controls Bar (compact on landscape mobile) ─────── */}
       <div
-        className="w-full flex flex-col items-center gap-2 px-4 pb-4 pt-2"
-        style={{ height: CONTROLS_HEIGHT }}
+        className="w-full flex flex-col items-center justify-center gap-1.5 px-4"
+        style={{ height: controlsH, paddingBottom: screenLandscape ? 4 : 12 }}
       >
         {/* Progress bar */}
         <div className="w-full max-w-md h-[3px] rounded-full bg-black/10 overflow-hidden">
@@ -244,7 +277,7 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
         </div>
 
         {/* Buttons */}
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-4">
           <button
             onClick={goPrev}
             disabled={currentPage === 0}
@@ -257,7 +290,9 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
           </button>
 
           <div className="flex flex-col items-center min-w-[60px]">
-            <span className="text-[10px] font-semibold tracking-widest text-amber-900/60 uppercase">Page</span>
+            {!screenLandscape && (
+              <span className="text-[10px] font-semibold tracking-widest text-amber-900/60 uppercase">Page</span>
+            )}
             <span className="text-base font-bold text-amber-950 leading-tight tabular-nums">
               {currentPage + 1}
               <span className="text-xs font-normal text-amber-900/50"> / {totalPages}</span>
@@ -288,9 +323,11 @@ export default function Flipbook({ pages, isLandscape }: FlipbookProps) {
           )}
         </div>
 
-        <p className="text-[10px] tracking-widest text-amber-900/40 uppercase font-medium">
-          Pinch to zoom • Tap corners to flip
-        </p>
+        {!screenLandscape && (
+          <p className="text-[10px] tracking-widest text-amber-900/40 uppercase font-medium">
+            Pinch to zoom • Tap corners to flip
+          </p>
+        )}
       </div>
     </div>
   );
