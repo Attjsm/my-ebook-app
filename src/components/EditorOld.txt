@@ -1,0 +1,103 @@
+"use client";
+import React, { useState } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// ✅ แก้ไขใหม่: ใช้ Worker จากโฟลเดอร์ในเครื่องแทนการโหลดจากอินเทอร์เน็ต
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
+
+export default function Editor({ onConverted }: { onConverted: (images: string[]) => void }) {
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0); // เพิ่มสถานะบอกความคืบหน้า
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setProgress(0);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      // โหลดไฟล์ PDF
+      const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+      const pdf = await loadingTask.promise;
+      const pageImages: string[] = [];
+
+      // วนลูปแปลง PDF ทุกหน้าเป็นรูปภาพ
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        // ปรับ scale เป็น 2.0 เพื่อความคมชัดที่มากขึ้น
+        const viewport = page.getViewport({ scale: 2.0 });
+        
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        
+        if (context) {
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          // ✅ ใช้โครงสร้างการ render ที่รองรับทั้งเวอร์ชันเก่าและใหม่
+          const renderContext = {
+            canvasContext: context,
+            viewport: viewport,
+          };
+
+          await page.render(renderContext).promise;
+          
+          // แปลงเป็นรูปภาพ WebP คุณภาพสูง
+          pageImages.push(canvas.toDataURL('image/webp', 0.9));
+        }
+        
+        // อัปเดตความคืบหน้า
+        setProgress(Math.round((i / pdf.numPages) * 100));
+      }
+
+      onConverted(pageImages);
+    } catch (error) {
+      console.error("เกิดข้อผิดพลาดในการอ่าน PDF:", error);
+      alert("ไม่สามารถอ่านไฟล์ PDF นี้ได้ กรุณาลองไฟล์อื่น");
+    } finally {
+      setLoading(false);
+      setProgress(0);
+    }
+  };
+
+  return (
+    <div className="p-6 bg-white border-b shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-black text-blue-900 flex items-center gap-2">
+          <span className="bg-blue-600 text-white p-1 rounded">PDF</span> Flipbook Creator
+        </h1>
+        <p className="text-sm text-gray-500 font-medium">เปลี่ยนไฟล์ PDF ของคุณให้เป็นหนังสือพลิกหน้าได้ทันที</p>
+      </div>
+
+      <div className="flex flex-col items-end gap-2">
+        <label className={`
+          relative cursor-pointer px-8 py-3 rounded-xl font-bold text-white transition-all shadow-lg
+          ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-105 active:scale-95'}
+        `}>
+          {loading ? `กำลังประมวลผล ${progress}%` : "📂 เลือกไฟล์ PDF"}
+          <input 
+            type="file" 
+            accept="application/pdf" 
+            className="hidden" 
+            onChange={handleFileUpload} 
+            disabled={loading} 
+          />
+        </label>
+        
+        {loading && (
+          <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+            <div 
+              className="bg-blue-600 h-full transition-all duration-300" 
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

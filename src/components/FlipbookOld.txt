@@ -1,0 +1,126 @@
+"use client";
+import React, { useRef } from 'react';
+import HTMLFlipBook from 'react-pageflip';
+
+export default function Flipbook({ pages, isLandscape }: { pages: string[], isLandscape: boolean }) {
+  const flipBookRef = useRef<any>(null);
+
+  // ✅ แก้ไข: ใช้สัดส่วนกระดาษที่แน่นอน (Ratio) 
+  // แนวตั้งใช้ 3:4 (300x400) | แนวนอนใช้ 4:3 (400x300)
+  const width = isLandscape ? 400 : 300;
+  const height = isLandscape ? 300 : 400;
+
+  const playFlipSound = () => {
+    const audio = new Audio('https://assets.mixkit.co');
+    audio.volume = 0.2;
+    audio.play().catch(() => {});
+  };
+
+  if (pages.length === 0) return null;
+
+  return (
+    // ✅ ใช้ flex-col และ h-full เพื่อให้ Container คุมพื้นที่ทั้งหมด
+    <div className="w-full h-full flex flex-col items-center justify-center overflow-hidden p-2">
+      
+      <div className="relative w-full h-full flex items-center justify-center">
+        {/* @ts-ignore */}
+        <HTMLFlipBook
+          width={width}
+          height={height}
+          size="fixed" // ✅ เปลี่ยนจาก stretch เป็น fixed เพื่อให้รักษาสัดส่วนไม่ให้หลุดขอบ
+          minWidth={200}
+          maxWidth={2000}
+          minHeight={200}
+          maxHeight={2000}
+          
+          // ✅ ตั้งค่าให้พอดีหน้าจออัตโนมัติ
+          usePortrait={!isLandscape}
+          startPage={0}
+          drawShadow={true}
+          showCover={true}
+          mobileScrollSupport={true}
+          onFlip={playFlipSound}
+          className="shadow-2xl mx-auto"
+          ref={flipBookRef}
+          style={{ margin: 'auto' }} // จัดกึ่งกลางเป๊ะๆ
+        >
+          {pages.map((image, index) => (
+            <div key={index} className="bg-white flex items-center justify-center overflow-hidden border border-gray-100">
+              <img 
+                src={image} 
+                alt={`Page ${index + 1}`} 
+                // ✅ ใช้ h-full w-auto และ object-contain เพื่อให้รูปไม่ล้นขอบบนล่าง
+                className="max-w-full max-h-full w-auto h-auto object-contain pointer-events-none" 
+              />
+            </div>
+          ))}
+        </HTMLFlipBook>
+      </div>
+
+      {/* ✅ เพิ่มแถบช่วยบอกเลขหน้าด้านล่างเพื่อให้รู้ว่าไม่หลุดจอ */}
+      <div className="mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+        Click corner to flip • {isLandscape ? 'Landscape Mode' : 'Portrait Mode'}
+      </div>
+    </div>
+  );
+}
+
+********ด้านล่างนี้ เวอร์ชั่นเก่ากว่า*******
+"use client";
+import React, { useRef, useEffect } from 'react';
+import HTMLFlipBook from 'react-pageflip';
+
+export default function Flipbook({ pages, isLandscape }: { pages: string[], isLandscape: boolean }) {
+  const flipBookRef = useRef<any>(null);
+
+  // กำหนดอัตราส่วนหน้ากระดาษ (Ratio)
+  // แนวตั้ง: กว้าง 700 สูง 1000 | แนวนอน: กว้าง 1000 สูง 700
+  const width = isLandscape ? 1000 : 700;
+  const height = isLandscape ? 700 : 1000;
+
+  const playFlipSound = () => {
+    const audio = new Audio('https://assets.mixkit.co');
+    audio.volume = 0.2;
+    audio.play().catch(() => {});
+  };
+
+  if (pages.length === 0) {
+    return <div className="p-20 text-gray-400 font-bold">กรุณาอัปโหลดไฟล์ PDF เพื่อเริ่มใช้งาน</div>;
+  }
+
+  return (
+    <div className="w-full h-[85vh] flex items-center justify-center p-2 md:p-6 bg-slate-200 overflow-hidden">
+      <div className="w-full h-full max-w-7xl flex items-center justify-center">
+        {/* @ts-ignore */}
+        <HTMLFlipBook
+          width={width}
+          height={height}
+          size="stretch"         // บังคับให้ขยายเต็มพื้นที่ Container
+          minWidth={200}
+          maxWidth={2000}
+          minHeight={200}
+          maxHeight={2000}
+          drawShadow={true}
+          maxShadowOpacity={0.4}
+          showCover={true}
+          mobileScrollSupport={true}
+          onFlip={playFlipSound}
+          className="shadow-2xl bg-white"
+          ref={flipBookRef}
+          // บังคับให้เริ่มหน้า 1 เสมอเมื่อเปลี่ยนโหมด
+          startPage={0}
+        >
+          {pages.map((image, index) => (
+            <div key={index} className="bg-white flex items-center justify-center w-full h-full border-l border-gray-100">
+              <img 
+                src={image} 
+                alt={`Page ${index + 1}`} 
+                className="w-full h-full object-contain pointer-events-none" 
+                />
+            </div>
+          ))}
+        </HTMLFlipBook>
+      </div>
+    </div>
+  );
+}
