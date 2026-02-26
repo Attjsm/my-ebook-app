@@ -24,12 +24,12 @@ export default function Editor({
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [isLandscape, setIsLandscape] = useState(false);
+  
   const [pdfPages, setPdfPages] = useState<string[]>([]);
   const [isSharing, setIsSharing] = useState(false);
 
   const handleOrientation = (landscape: boolean) => {
-    setIsLandscape(landscape);
+    
     onOrientationChange(landscape);
   };
 
@@ -54,7 +54,7 @@ export default function Editor({
         if (context) {
           canvas.height = viewport.height;
           canvas.width = viewport.width;
-          await page.render({ canvasContext: context, viewport }).promise;
+          await page.render({ canvasContext: context, viewport } as any).promise;
           pageImages.push(canvas.toDataURL('image/webp', 0.8));
         }
 
