@@ -46,7 +46,7 @@ export default function Home() {
       <section className="grow w-full relative bg-slate-200 overflow-hidden flex items-center justify-center">
         {pdfPages.length > 0 ? (
          
-          <div className="w-full h-full max-w-[1400px] flex items-center justify-center p-2">
+          <div className="w-full h-full max-w-[1600px] flex items-center justify-center p-2">
             {/* ใส่ key เพื่อให้ React ทำลายตัวเก่าและสร้างตัวใหม่เมื่ออัปโหลดไฟล์ใหม่ */}
             <Flipbook 
               key={flipbookKey} 

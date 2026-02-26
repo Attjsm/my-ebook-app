@@ -7,8 +7,8 @@ export default function Flipbook({ pages, isLandscape }: { pages: string[], isLa
 
   // ✅ ปรับอัตราส่วนให้เหมาะสม (สัดส่วนมาตรฐานกระดาษ A4/Letter)
   // แนวตั้ง 3:4.2 (ขยายความสูงเพิ่ม) | แวนอน 4.2:3 (ขยายความกว้างเพิ่ม)
-  const width = isLandscape ? 800 : 300;
-  const height = isLandscape ? 580 : 600; 
+  const width = isLandscape ? 400 : 300;
+  const height = isLandscape ? 300 : 400; 
 
   const playFlipSound = () => {
     const audio = new Audio('https://assets.mixkit.co');
@@ -28,10 +28,10 @@ export default function Flipbook({ pages, isLandscape }: { pages: string[], isLa
           width={width}
           height={height}
           size="stretch"         // ✅ กลับมาใช้ stretch แต่คุมด้วย Container h-full
-          minWidth={100}
-          maxWidth={3000}
-          minHeight={100}
-          maxHeight={3000}
+          minWidth={200}
+          maxWidth={2000}
+          minHeight={200}
+          maxHeight={2000}
           
           usePortrait={!isLandscape}
           startPage={0}
