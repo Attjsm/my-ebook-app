@@ -1,16 +1,20 @@
 "use client";
 import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import Editor from '../src/components/Editor';
+
 
 // ✅ แก้ปัญหา DOMMatrix: ใช้ dynamic import และปิด SSR (Server Side Rendering) ให้เด็ดขาด
-const Flipbook = dynamic(() => import('../src/components/Flipbook'), { 
+const Editor = dynamic(() => import('../src/components/Editor'), { 
   ssr: false,
   loading: () => (
     <div className="h-full w-full flex items-center justify-center bg-slate-200">
       <p className="font-bold text-blue-600 animate-pulse">กำลังเตรียมระบบแสดงผล...</p>
     </div>
   )
+});
+
+const Flipbook = dynamic(() => import('../src/components/Flipbook'), { 
+  ssr: false 
 });
 
 export default function Home() {
